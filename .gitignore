@@ -1,0 +1,15 @@
+# Dependencies
+/node_modules
+
+# Environment variables
+.env
+
+# Application state
+state.json
+
+# Investigation files (if any)
+investigate.js
+
+# OS generated files
+.DS_Store
+Thumbs.db
