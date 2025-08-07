@@ -1,0 +1,125 @@
+{
+  "name": "My workflow 2",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8-22/2 * * *"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "e2d0d720-708d-46b7-927c-21a65c1b84dc",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "url": "=http://host.docker.internal:3001/api/pv?query=from_latest_achievement",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        176,
+        0
+      ],
+      "id": "642c096c-a0f9-4a2b-94b8-d248d794f108",
+      "name": "API"
+    },
+    {
+      "parameters": {
+        "jsCode": "const apiResponse = $input.item.json;\n\n// =====================================================================\n//  STEP 1: 定义所有需要的模板函数 (从 flexMessageGenerator.js 移植)\n// =====================================================================\n\nconst PV_TARGET = 300000;\n\nfunction createPvBlock(title, pv, ratio, color) {\n  return {\n    type: \"box\", layout: \"vertical\", margin: \"lg\", spacing: \"sm\",\n    contents: [\n      {\n        type: \"box\", layout: \"baseline\", spacing: \"sm\",\n        contents: [\n          { type: \"text\", text: title, color: \"#666666\", size: \"sm\", flex: 2 },\n          { type: \"text\", text: `${(pv || 0).toLocaleString()} / ${PV_TARGET.toLocaleString()}`, wrap: true, color: \"#2C3E50\", size: \"md\", weight: \"bold\", flex: 5, align: \"end\" }\n        ]\n      },\n      {\n        type: \"box\", layout: \"vertical\", margin: \"sm\", height: \"8px\", backgroundColor: \"#E5E7E9\", cornerRadius: \"4px\",\n        contents: [\n          { type: \"box\", layout: \"vertical\", height: \"100%\", width: `${ratio}%`, backgroundColor: color, cornerRadius: \"4px\", contents: [] }\n        ]\n      }\n    ]\n  };\n}\n\nfunction createPvDashboardMessage(data) {\n  const title = data.title || '📊 PV 報告';\n  const dateRangeText = data.dateRangeText || 'N/A';\n  const leftPV = data.leftPV || 0;\n  const rightPV = data.rightPV || 0;\n  const achievementDate = data.achievementDate || '無記錄';\n  const leftRatio = Math.min(100, Math.floor((leftPV / PV_TARGET) * 100));\n  const rightRatio = Math.min(100, Math.floor((rightPV / PV_TARGET) * 100));\n  const rightColor = rightPV >= PV_TARGET ? '#27AE60' : '#5E87E1';\n\n  return {\n    type: \"flex\",\n    altText: `PV報告: 左 ${leftPV.toLocaleString()} | 右 ${rightPV.toLocaleString()}`,\n    contents: {\n      type: \"bubble\",\n      body: {\n        type: \"box\", layout: \"vertical\", spacing: \"md\",\n        contents: [\n          { type: \"text\", text: title, weight: \"bold\", size: \"lg\", color: \"#1A5276\" },\n          { type: \"text\", text: dateRangeText, size: \"sm\", color: \"#666666\" },\n          { type: \"separator\", margin: \"md\" },\n          createPvBlock('🔵 左區', leftPV, leftRatio, '#5E87E1'),\n          { type: \"separator\", margin: \"md\" },\n          createPvBlock('🟢 右區', rightPV, rightRatio, rightColor),\n          { type: \"separator\", margin: \"md\" },\n          ...(achievementDate !== '無記錄' ? [{\n              type: \"box\", layout: \"horizontal\", margin: \"md\",\n              contents: [\n                  { type: \"text\", text: \"🏆 最近達標日:\", size: \"sm\", color: \"#555555\", flex: 0 },\n                  { type: \"text\", text: achievementDate, size: \"sm\", color: \"#111111\", align: \"end\" }\n              ]\n          }] : [])\n        ]\n      }\n    }\n  };\n}\n\n// =====================================================================\n//  STEP 2: 处理输入数据并调用模板\n// =====================================================================\n\nconst dateRange = apiResponse.dateRange;\nlet dateLabel = '查询范围出错';\n\nif (dateRange && dateRange.startDate && dateRange.endDate) {\n    dateLabel = dateRange.startDate === dateRange.endDate\n        ? dateRange.startDate.substring(5).replace('-', '/')\n        : `${dateRange.startDate.substring(5).replace('-', '/')} - ${dateRange.endDate.substring(5).replace('-', '/')}`;\n}\n\nlet achievementDateStr = '无记录';\nif (dateRange && dateRange.startDate) {\n    const achieveDate = new Date(dateRange.startDate);\n    achieveDate.setDate(achieveDate.getDate() - 1);\n    achievementDateStr = `${achieveDate.getFullYear()}-${String(achieveDate.getMonth() + 1).padStart(2, '0')}-${String(achieveDate.getDate()).padStart(2, '0')}`;\n}\n\nconst flexMessage = createPvDashboardMessage({\n    title: '📈 自動PV追蹤報告',\n    dateRangeText: dateLabel,\n    leftPV: apiResponse.leftPV,\n    rightPV: apiResponse.rightPV,\n    achievementDate: achievementDateStr\n});\n\n// =====================================================================\n//  STEP 3: 返回最终结果\n// =====================================================================\n\nreturn {\n  json: {\n    flex: flexMessage\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        384,
+        0
+      ],
+      "id": "b8170711-cdba-4424-a8c6-3158c4da7693",
+      "name": "Code"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.line.me/v2/bot/message/push",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n  {\n    \"to\": \"Uf1a11af55af9487858b028d0cb8457e5\",\n    \"messages\": [\n      $json.flex\n    ]\n  }\n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        560,
+        0
+      ],
+      "id": "bd48c25d-9569-45f2-b653-5aa0c937e4e9",
+      "name": "HTTP Request1",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "Rkjmo7UwPk7fI2YE",
+          "name": "Header Auth account 2"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "API": {
+      "main": [
+        [
+          {
+            "node": "Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "31319348-d350-4ad3-9630-ac865db74ac9",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "4179cfedc3eb35ecbed4e4e73e7f608deb114a05dd43b764ff2888c847d52883"
+  },
+  "id": "KMmL6dnOWHAQVVgn",
+  "tags": []
+}

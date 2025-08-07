@@ -1,0 +1,121 @@
+{
+  "name": "My workflow 3",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "feeb72d2-293a-4a51-af42-80171330c72c",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "5cbfbbfd-0818-4b91-b15c-b21a1a1941fa",
+      "name": "Webhook",
+      "webhookId": "feeb72d2-293a-4a51-af42-80171330c72c"
+    },
+    {
+      "parameters": {
+        "url": "=http://host.docker.internal:3001/api/pv?query={{ $json.body.events[0].message.text }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        208,
+        0
+      ],
+      "id": "5e51b323-fc4e-432e-8626-e2aeb63049f1",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 从上一个 HTTP Request 节点获取 API 回传的数据\nconst apiResponse = $input.item.json;\n\n// --- STEP 1: 定义模板函数 (从你的 flexMessageGenerator.js 移植过来) ---\n\nconst PV_TARGET = 300000;\n\nfunction createPvBlock(title, pv, ratio, color) {\n  return {\n    type: \"box\",\n    layout: \"vertical\",\n    margin: \"lg\",\n    spacing: \"sm\",\n    contents: [\n      {\n        type: \"box\",\n        layout: \"baseline\",\n        spacing: \"sm\",\n        contents: [\n          {\n            type: \"text\",\n            text: title,\n            color: \"#666666\",\n            size: \"sm\",\n            flex: 2,\n          },\n          {\n            type: \"text\",\n            text: `${(pv || 0).toLocaleString()} / ${PV_TARGET.toLocaleString()}`,\n            wrap: true,\n            color: \"#2C3E50\",\n            size: \"md\",\n            weight: \"bold\",\n            flex: 5,\n            align: \"end\",\n          }\n        ]\n      },\n      {\n        type: \"box\",\n        layout: \"vertical\",\n        margin: \"sm\",\n        height: \"8px\",\n        backgroundColor: \"#E5E7E9\",\n        cornerRadius: \"4px\",\n        contents: [\n          {\n            type: \"box\",\n            layout: \"vertical\",\n            height: \"100%\",\n            width: `${ratio}%`,\n            backgroundColor: color,\n            cornerRadius: \"4px\",\n            contents: []\n          }\n        ]\n      }\n    ]\n  };\n}\n\n// --- STEP 2: 处理输入数据 ---\n\nconst dateRange = apiResponse.dateRange;\nconst leftPV = apiResponse.leftPV || 0;\nconst rightPV = apiResponse.rightPV || 0;\n// 我们暂时硬编码 achievementDate，之后可以再通过 API 获取\nconst achievementDate = '2025-08-02'; \n\nconst dateLabel = dateRange.startDate === dateRange.endDate\n    ? dateRange.startDate.substring(5).replace('-', '/')\n    : `${dateRange.startDate.substring(5).replace('-', '/')} - ${dateRange.endDate.substring(5).replace('-', '/')}`;\n\nconst leftRatio = Math.min(100, Math.floor((leftPV / PV_TARGET) * 100));\nconst rightRatio = Math.min(100, Math.floor((rightPV / PV_TARGET) * 100));\nconst rightColor = rightPV >= PV_TARGET ? '#27AE60' : '#5E87E1';\n\n// --- STEP 3: 构建完整的 Flex Message 对象 ---\n\nconst flexMessage = {\n  type: \"flex\",\n  altText: `PV報告: 左 ${leftPV.toLocaleString()} | 右 ${rightPV.toLocaleString()}`,\n  contents: {\n    type: \"bubble\",\n    body: {\n      type: \"box\",\n      layout: \"vertical\",\n      spacing: \"md\",\n      contents: [\n        {\n          type: \"text\",\n          text: \"📊 PV 查詢結果\",\n          weight: \"bold\",\n          size: \"lg\",\n          color: \"#1A5276\",\n        },\n        {\n          type: \"text\",\n          text: dateLabel,\n          size: \"sm\",\n          color: \"#666666\",\n        },\n        {\n          type: \"separator\",\n          margin: \"md\"\n        },\n        createPvBlock('🔵 左區', leftPV, leftRatio, '#5E87E1'),\n        {\n          type: \"separator\",\n          margin: \"md\"\n        },\n        createPvBlock('🟢 右區', rightPV, rightRatio, rightColor),\n        {\n          type: \"separator\",\n          margin: \"md\"\n        },\n        {\n          type: \"box\",\n          layout: \"horizontal\",\n          margin: \"md\",\n          contents: [\n            {\n              type: \"text\",\n              text: \"🏆 最近達標日:\",\n              size: \"sm\",\n              color: \"#555555\",\n              flex: 0,\n            },\n            {\n              type: \"text\",\n              text: achievementDate,\n              size: \"sm\",\n              color: \"#111111\",\n              align: \"end\",\n            }\n          ]\n        }\n      ]\n    }\n  }\n};\n\n// --- STEP 4: 返回最终结果 ---\n\nreturn {\n  json: {\n    flex: flexMessage\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        416,
+        0
+      ],
+      "id": "5672996b-2b2c-4905-8de3-768d8da0b571",
+      "name": "Code"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.line.me/v2/bot/message/push",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n  {\n    \"to\": $('Webhook').item.json.body.events[0].source.userId,\n    \"messages\": [\n      $json.flex\n    ]\n  }\n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        624,
+        0
+      ],
+      "id": "eadae8da-f45a-499e-abcf-d76c6c085e09",
+      "name": "HTTP Request1",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "Rkjmo7UwPk7fI2YE",
+          "name": "Header Auth account 2"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "11a03e16-d062-4e64-b6a4-217e97d27e8c",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "4179cfedc3eb35ecbed4e4e73e7f608deb114a05dd43b764ff2888c847d52883"
+  },
+  "id": "RHF9NGRG5y0AbghU",
+  "tags": []
+}
