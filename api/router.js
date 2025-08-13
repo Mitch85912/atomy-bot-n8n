@@ -1,18 +1,20 @@
+// --- START OF MODIFIED FILE router.js ---
+
 import { Router } from 'express';
-import { getPvReport, getLatestAchievement } from './controller.js';
+// ★ 移除 getLatestAchievement 的 import ★
+import { getPvReport, updateAndStoreAchievementDate } from './controller.js';
 
 const router = Router();
 
-// 定義我們的 API 端點
-// GET /api/pv?query=0801
-// GET /api/pv?query=上半個月
+// PV 查詢路由
 router.get('/pv', getPvReport); 
 
-// GET /api/achievement/latest
-router.get('/achievement/latest', getLatestAchievement);
+// ★ 移除不再需要的路由 (GET /api/achievement/latest) ★
 
-// 未來可以擴充訂購 API
-// POST /api/order
-// router.post('/order', createOrder);
+// 觸發「更新並儲存」最新達標日的端點
+router.post('/achievement/update', updateAndStoreAchievementDate);
+
+
 
 export const apiRouter = router;
+// --- END OF MODIFIED FILE router.js ---
